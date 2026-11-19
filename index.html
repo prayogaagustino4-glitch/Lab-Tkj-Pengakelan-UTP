@@ -1,0 +1,1365 @@
+<!DOCTYPE html>
+<html lang="id" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lab Maya TKJ: Simulasi CLI Ping & Packet Traceroute</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            cyber: {
+              bg: '#090d16',
+              panel: '#0f172a',
+              card: '#1e293b',
+              border: '#334155',
+              cyan: '#06b6d4',
+              green: '#10b981',
+              amber: '#f59e0b',
+              red: '#ef4444',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    /* Custom Scrollbar untuk Terminal dan Log */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0f172a;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #475569;
+    }
+
+    /* Animasi denyut node jaringan */
+    @keyframes pulse-ring {
+      0% { transform: scale(0.95); opacity: 0.8; }
+      70% { transform: scale(1.25); opacity: 0; }
+      100% { transform: scale(1.25); opacity: 0; }
+    }
+    .node-pulse {
+      transform-origin: center;
+      transform-box: fill-box;
+      animation: pulse-ring 1.5s cubic-bezier(0.24, 0, 0.38, 1) infinite;
+    }
+
+    /* Garis aliran data putus-putus */
+    @keyframes dash-flow {
+      to {
+        stroke-dashoffset: -24;
+      }
+    }
+    .cable-active {
+      stroke-dasharray: 6 6;
+      animation: dash-flow 0.8s linear infinite;
+    }
+  </style>
+</head>
+<body class="bg-cyber-bg text-slate-200 font-sans min-h-screen flex flex-col selection:bg-cyan-500/30 selection:text-cyan-200">
+
+  <!-- ==================== HEADER ATAS ==================== -->
+  <header class="bg-slate-900/95 border-b border-slate-800 px-4 py-3 sticky top-0 z-30 backdrop-blur-md">
+    <div class="max-w-[1600px] mx-auto flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+      <!-- Judul & Identitas Modul -->
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/20 shrink-0">
+          <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01" />
+          </svg>
+        </div>
+        <div>
+          <div class="flex items-center gap-2 flex-wrap">
+            <h1 class="text-base sm:text-lg font-bold text-white tracking-tight">Lab Maya TKJ: Simulasi CLI Ping & Packet Traceroute</h1>
+            <span class="text-[11px] font-mono px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/30">MODUL JARINGAN DASAR</span>
+          </div>
+          <p class="text-xs text-slate-400 flex items-center gap-2 mt-0.5 flex-wrap">
+            <span>Perangkat Lokal: <strong class="font-mono text-cyan-300">PC-Client (192.168.1.10)</strong></span>
+            <span class="hidden sm:inline text-slate-600">•</span>
+            <span>Subnet: <span class="font-mono text-slate-300">255.255.255.0</span></span>
+            <span class="hidden sm:inline text-slate-600">•</span>
+            <span>Gateway: <span class="font-mono text-slate-300">192.168.1.1</span></span>
+          </p>
+        </div>
+      </div>
+
+      <!-- Daftar Target IP & Tombol Bantuan -->
+      <div class="flex flex-wrap items-center gap-2">
+        <div class="flex flex-wrap items-center gap-1.5 bg-slate-950/80 border border-slate-800 px-2.5 py-1.5 rounded-xl text-xs">
+          <span class="text-slate-400 font-medium mr-1">Target IP:</span>
+          <button onclick="insertCommand('ping 192.168.1.1')" title="Klik untuk uji ping ke Gateway/Router" class="font-mono px-2 py-0.5 rounded-md bg-slate-800 hover:bg-cyan-950 text-cyan-300 border border-slate-700 hover:border-cyan-500/50 transition cursor-pointer">
+            192.168.1.1 <span class="text-slate-400 text-[10px]">(Router)</span>
+          </button>
+          <button onclick="insertCommand('ping 10.10.10.1')" title="Klik untuk uji ping ke Server Utama" class="font-mono px-2 py-0.5 rounded-md bg-slate-800 hover:bg-emerald-950 text-emerald-300 border border-slate-700 hover:border-emerald-500/50 transition cursor-pointer">
+            10.10.10.1 <span class="text-slate-400 text-[10px]">(Server)</span>
+          </button>
+          <button onclick="insertCommand('tracert 8.8.8.8')" title="Klik untuk uji tracert ke DNS Publik" class="font-mono px-2 py-0.5 rounded-md bg-slate-800 hover:bg-indigo-950 text-indigo-300 border border-slate-700 hover:border-indigo-500/50 transition cursor-pointer">
+            8.8.8.8 <span class="text-slate-400 text-[10px]">(DNS)</span>
+          </button>
+          <button onclick="insertCommand('ping 192.168.1.99')" title="Klik untuk uji simulasi RTO / Host Offline" class="font-mono px-2 py-0.5 rounded-md bg-slate-800 hover:bg-rose-950 text-rose-300 border border-slate-700 hover:border-rose-500/50 transition cursor-pointer">
+            192.168.1.99 <span class="text-slate-400 text-[10px]">(Offline)</span>
+          </button>
+        </div>
+
+        <button onclick="toggleHelpModal()" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-medium transition cursor-pointer">
+          <svg class="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <span>Panduan Praktikum</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ==================== KONTEN UTAMA 3 PANEL ==================== -->
+  <main class="flex-1 max-w-[1600px] w-full mx-auto p-3 sm:p-4 grid grid-cols-1 lg:grid-cols-12 gap-4">
+
+    <!-- ==================== PANEL KIRI: TERMINAL CLI (4 Kolom) ==================== -->
+    <section class="lg:col-span-4 bg-cyber-panel border border-slate-800 rounded-2xl flex flex-col overflow-hidden shadow-xl min-h-[460px] lg:h-[calc(100vh-105px)]">
+      <!-- Bar Judul Terminal -->
+      <div class="bg-slate-900 px-4 py-2.5 border-b border-slate-800 flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <div class="flex items-center gap-1.5">
+            <span class="w-3 h-3 rounded-full bg-rose-500/80"></span>
+            <span class="w-3 h-3 rounded-full bg-amber-500/80"></span>
+            <span class="w-3 h-3 rounded-full bg-emerald-500/80"></span>
+          </div>
+          <span class="text-xs font-mono font-semibold text-slate-300 ml-2">CLI Terminal — PC-Client</span>
+        </div>
+        <div class="flex items-center gap-1.5">
+          <button id="btnStopCli" onclick="stopSimulation()" disabled class="px-2.5 py-1 rounded-lg bg-rose-500/10 text-rose-400 border border-rose-500/30 hover:bg-rose-500/20 disabled:opacity-40 disabled:cursor-not-allowed text-[11px] font-mono font-medium transition cursor-pointer flex items-center gap-1">
+            <span class="w-2 h-2 rounded-xs bg-rose-400"></span> Stop (Ctrl+C)
+          </button>
+          <button onclick="clearTerminal()" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-mono transition cursor-pointer">
+            Clear
+          </button>
+        </div>
+      </div>
+
+      <!-- Area Output Teks Terminal -->
+      <div id="terminalOutput" onclick="focusCliInput()" class="flex-1 p-3.5 font-mono text-xs sm:text-[13px] leading-relaxed overflow-y-auto bg-[#070b14] text-slate-200 space-y-1 cursor-text">
+        <div class="text-cyan-400 font-semibold">TKJ Virtual OS [Versi 10.0.2026 - Lab Jaringan]</div>
+        <div class="text-slate-400">(c) Laboratorium Teknik Komputer dan Jaringan. Ketik <span class="text-amber-300">'help'</span> untuk daftar perintah.</div>
+        <div class="text-slate-500 pb-2">------------------------------------------------------------</div>
+      </div>
+
+      <!-- Quick Command Chips -->
+      <div class="bg-slate-900/90 border-t border-slate-800/80 px-3 py-2 flex items-center gap-1.5 overflow-x-auto">
+        <span class="text-[11px] text-slate-400 shrink-0">Perintah Cepat:</span>
+        <button onclick="runQuickCommand('ping 10.10.10.1')" class="shrink-0 font-mono text-[11px] px-2 py-1 rounded-md bg-slate-800 hover:bg-cyan-950 text-cyan-300 border border-slate-700 transition cursor-pointer">ping 10.10.10.1</button>
+        <button onclick="runQuickCommand('tracert 10.10.10.1')" class="shrink-0 font-mono text-[11px] px-2 py-1 rounded-md bg-slate-800 hover:bg-amber-950 text-amber-300 border border-slate-700 transition cursor-pointer">tracert 10.10.10.1</button>
+        <button onclick="runQuickCommand('ping 192.168.1.99')" class="shrink-0 font-mono text-[11px] px-2 py-1 rounded-md bg-slate-800 hover:bg-rose-950 text-rose-300 border border-slate-700 transition cursor-pointer">ping 192.168.1.99</button>
+        <button onclick="runQuickCommand('ipconfig')" class="shrink-0 font-mono text-[11px] px-2 py-1 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition cursor-pointer">ipconfig</button>
+        <button onclick="runQuickCommand('help')" class="shrink-0 font-mono text-[11px] px-2 py-1 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition cursor-pointer">help</button>
+      </div>
+
+      <!-- Baris Input Command -->
+      <form id="cliForm" onsubmit="handleCommandSubmit(event)" class="bg-[#0a101d] border-t border-slate-800 px-3.5 py-2.5 flex items-center gap-2">
+        <span class="font-mono text-xs sm:text-[13px] text-emerald-400 font-semibold shrink-0 select-none">C:\Users\SiswaTKJ&gt;</span>
+        <input
+          id="cliInput"
+          type="text"
+          autocomplete="off"
+          spellcheck="false"
+          placeholder="Ketik perintah (mis. ping 10.10.10.1)..."
+          class="w-full bg-transparent font-mono text-xs sm:text-[13px] text-white placeholder-slate-600 focus:outline-none"
+        />
+        <button type="submit" class="px-3 py-1 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-semibold transition shrink-0 cursor-pointer">
+          Run
+        </button>
+      </form>
+    </section>
+
+    <!-- ==================== PANEL TENGAH: ANIMASI TOPOLOGI 3 HOP (4 Kolom) ==================== -->
+    <section class="lg:col-span-4 bg-cyber-panel border border-slate-800 rounded-2xl flex flex-col overflow-hidden shadow-xl min-h-[480px] lg:h-[calc(100vh-105px)]">
+      <!-- Header Panel Topologi -->
+      <div class="bg-slate-900 px-4 py-2.5 border-b border-slate-800 flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <svg class="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
+          </svg>
+          <h2 class="text-xs font-semibold uppercase tracking-wider text-slate-200">Topologi Jaringan (3-Hop Path)</h2>
+        </div>
+        <span id="simStatusBadge" class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-mono bg-slate-800 text-slate-300 border border-slate-700">
+          <span id="simStatusDot" class="w-2 h-2 rounded-full bg-slate-400"></span>
+          <span id="simStatusText">Idle / Siap</span>
+        </span>
+      </div>
+
+      <!-- Legenda Paket -->
+      <div class="bg-slate-950/60 border-b border-slate-800/80 px-3 py-2 flex flex-wrap items-center justify-center gap-3 text-[11px]">
+        <div class="flex items-center gap-1.5">
+          <span class="w-2.5 h-2.5 rounded-full bg-cyan-400 shadow-[0_0_8px_#22d3ee]"></span>
+          <span class="text-slate-300">Echo Request</span>
+        </div>
+        <div class="flex items-center gap-1.5">
+          <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]"></span>
+          <span class="text-slate-300">Echo Reply</span>
+        </div>
+        <div class="flex items-center gap-1.5">
+          <span class="w-2.5 h-2.5 rounded-full bg-amber-400 shadow-[0_0_8px_#fbbf24]"></span>
+          <span class="text-slate-300">TTL Exceeded</span>
+        </div>
+        <div class="flex items-center gap-1.5">
+          <span class="w-2.5 h-2.5 rounded-full bg-rose-500 shadow-[0_0_8px_#f43f5e]"></span>
+          <span class="text-slate-300">Packet Drop / RTO</span>
+        </div>
+      </div>
+
+      <!-- Area SVG Topologi Jaringan -->
+      <div class="flex-1 relative bg-[#070b14] flex items-center justify-center p-2 overflow-hidden">
+        <!-- Grid background halus -->
+        <div class="absolute inset-0 opacity-20" style="background-image: radial-gradient(#334155 1px, transparent 1px); background-size: 20px 20px;"></div>
+
+        <svg id="topologySvg" viewBox="0 0 420 520" class="w-full h-full max-h-[500px] relative z-10 select-none">
+          <defs>
+            <!-- Glow Filters -->
+            <filter id="glowCyan" x="-30%" y="-30%" width="160%" height="160%">
+              <feGaussianBlur stdDeviation="4" result="blur" />
+              <feComposite in="SourceGraphic" in2="blur" operator="over" />
+            </filter>
+            <filter id="glowGreen" x="-30%" y="-30%" width="160%" height="160%">
+              <feGaussianBlur stdDeviation="4" result="blur" />
+              <feComposite in="SourceGraphic" in2="blur" operator="over" />
+            </filter>
+            <filter id="glowAmber" x="-30%" y="-30%" width="160%" height="160%">
+              <feGaussianBlur stdDeviation="4" result="blur" />
+              <feComposite in="SourceGraphic" in2="blur" operator="over" />
+            </filter>
+            <filter id="glowRed" x="-30%" y="-30%" width="160%" height="160%">
+              <feGaussianBlur stdDeviation="4" result="blur" />
+              <feComposite in="SourceGraphic" in2="blur" operator="over" />
+            </filter>
+          </defs>
+
+          <!-- ==================== KABEL / LINK ANTAR NODE ==================== -->
+          <!-- Link 0 -> 1 (PC Client ke Switch) -->
+          <line id="link-0-1-base" x1="210" y1="75" x2="210" y2="195" stroke="#1e293b" stroke-width="5" stroke-linecap="round" />
+          <line id="link-0-1" x1="210" y1="75" x2="210" y2="195" stroke="#334155" stroke-width="2.5" stroke-linecap="round" />
+          <text x="224" y="138" fill="#64748b" font-size="10" font-family="JetBrains Mono">FastEthernet0/1</text>
+
+          <!-- Link 1 -> 2 (Switch ke Router) -->
+          <line id="link-1-2-base" x1="210" y1="195" x2="210" y2="320" stroke="#1e293b" stroke-width="5" stroke-linecap="round" />
+          <line id="link-1-2" x1="210" y1="195" x2="210" y2="320" stroke="#334155" stroke-width="2.5" stroke-linecap="round" />
+          <text x="224" y="260" fill="#64748b" font-size="10" font-family="JetBrains Mono">Gigabit0/1 (Trunk)</text>
+
+          <!-- Link 2 -> 3 (Router ke Server Tujuan) -->
+          <line id="link-2-3-base" x1="210" y1="320" x2="210" y2="445" stroke="#1e293b" stroke-width="5" stroke-linecap="round" />
+          <line id="link-2-3" x1="210" y1="320" x2="210" y2="445" stroke="#334155" stroke-width="2.5" stroke-linecap="round" />
+          <text x="224" y="385" fill="#64748b" font-size="10" font-family="JetBrains Mono">WAN / Fiber Link</text>
+
+          <!-- ==================== NODE 0: PC CLIENT ==================== -->
+          <g id="node-0" transform="translate(210, 75)">
+            <circle id="node-0-ring" r="32" fill="none" stroke="#06b6d4" stroke-width="2" opacity="0" />
+            <rect x="-28" y="-26" width="56" height="52" rx="12" fill="#0f172a" stroke="#06b6d4" stroke-width="2" id="node-0-box" />
+            <!-- Ikon Monitor PC -->
+            <rect x="-14" y="-14" width="28" height="18" rx="2" fill="none" stroke="#38bdf8" stroke-width="2" />
+            <line x1="-6" y1="8" x2="6" y2="8" stroke="#38bdf8" stroke-width="2" stroke-linecap="round" />
+            <line x1="0" y1="4" x2="0" y2="8" stroke="#38bdf8" stroke-width="2" />
+            <!-- Label Kiri -->
+            <g transform="translate(-40, 0)" text-anchor="end">
+              <text y="-6" fill="#f8fafc" font-size="12" font-weight="700" font-family="Inter">PC Client (Sumber)</text>
+              <text y="9" fill="#22d3ee" font-size="11" font-family="JetBrains Mono">192.168.1.10</text>
+            </g>
+          </g>
+
+          <!-- ==================== NODE 1: HOP 1 - SWITCH ==================== -->
+          <g id="node-1" transform="translate(210, 195)">
+            <circle id="node-1-ring" r="32" fill="none" stroke="#06b6d4" stroke-width="2" opacity="0" />
+            <rect x="-28" y="-24" width="56" height="48" rx="12" fill="#0f172a" stroke="#475569" stroke-width="2" id="node-1-box" />
+            <!-- Ikon Switch -->
+            <rect x="-16" y="-9" width="32" height="18" rx="3" fill="none" stroke="#94a3b8" stroke-width="2" id="node-1-icon" />
+            <circle cx="-9" cy="0" r="1.8" fill="#38bdf8" />
+            <circle cx="-3" cy="0" r="1.8" fill="#38bdf8" />
+            <circle cx="3" cy="0" r="1.8" fill="#38bdf8" />
+            <circle cx="9" cy="0" r="1.8" fill="#38bdf8" />
+            <!-- Label Kiri -->
+            <g transform="translate(-40, 0)" text-anchor="end">
+              <text y="-6" fill="#e2e8f0" font-size="12" font-weight="600" font-family="Inter">Hop 1: Switch L2/L3</text>
+              <text y="9" fill="#94a3b8" font-size="11" font-family="JetBrains Mono">192.168.1.2</text>
+            </g>
+          </g>
+
+          <!-- ==================== NODE 2: HOP 2 - ROUTER ==================== -->
+          <g id="node-2" transform="translate(210, 320)">
+            <circle id="node-2-ring" r="32" fill="none" stroke="#06b6d4" stroke-width="2" opacity="0" />
+            <circle r="26" fill="#0f172a" stroke="#475569" stroke-width="2" id="node-2-box" />
+            <!-- Ikon Router (Panah Silang) -->
+            <path d="M-10 -6 L-4 -6 M-10 -6 L-10 0 M10 -6 L4 -6 M10 -6 L10 0 M-10 6 L-4 6 M-10 6 L-10 0 M10 6 L4 6 M10 6 L10 0" stroke="#94a3b8" stroke-width="2" stroke-linecap="round" id="node-2-icon" />
+            <circle cx="0" cy="0" r="3" fill="#38bdf8" />
+            <!-- Label Kiri -->
+            <g transform="translate(-40, 0)" text-anchor="end">
+              <text y="-6" fill="#e2e8f0" font-size="12" font-weight="600" font-family="Inter">Hop 2: Gateway Router</text>
+              <text y="9" fill="#94a3b8" font-size="11" font-family="JetBrains Mono">192.168.1.1</text>
+            </g>
+          </g>
+
+          <!-- ==================== NODE 3: HOP 3 - SERVER TUJUAN ==================== -->
+          <g id="node-3" transform="translate(210, 445)">
+            <circle id="node-3-ring" r="32" fill="none" stroke="#06b6d4" stroke-width="2" opacity="0" />
+            <rect x="-28" y="-26" width="56" height="52" rx="12" fill="#0f172a" stroke="#475569" stroke-width="2" id="node-3-box" />
+            <!-- Ikon Server Rack -->
+            <rect x="-14" y="-14" width="28" height="11" rx="2" fill="none" stroke="#94a3b8" stroke-width="1.8" id="node-3-icon1" />
+            <rect x="-14" y="2" width="28" height="11" rx="2" fill="none" stroke="#94a3b8" stroke-width="1.8" id="node-3-icon2" />
+            <circle cx="-8" cy="-8.5" r="1.5" fill="#10b981" />
+            <circle cx="-8" cy="7.5" r="1.5" fill="#10b981" />
+            <!-- Label Kiri -->
+            <g transform="translate(-40, 0)" text-anchor="end">
+              <text id="targetNodeTitle" y="-6" fill="#e2e8f0" font-size="12" font-weight="600" font-family="Inter">Hop 3: Server Tujuan</text>
+              <text id="targetNodeIp" y="9" fill="#10b981" font-size="11" font-family="JetBrains Mono">10.10.10.1</text>
+            </g>
+          </g>
+
+          <!-- ==================== ELEMEN PAKET ANIMASI ==================== -->
+          <g id="packetGroup" visibility="hidden" transform="translate(210, 75)">
+            <circle id="packetHalo" r="14" fill="#06b6d4" opacity="0.25" />
+            <circle id="packetCore" r="7" fill="#22d3ee" stroke="#ffffff" stroke-width="1.5" />
+            <!-- Badge info melayang di samping paket -->
+            <g transform="translate(18, -10)">
+              <rect x="0" y="0" width="96" height="22" rx="6" fill="#0f172a" stroke="#06b6d4" stroke-width="1.2" id="packetBadgeBox" />
+              <text id="packetBadgeText" x="48" y="14" text-anchor="middle" fill="#e0f2fe" font-size="10" font-weight="600" font-family="JetBrains Mono">ICMP TTL=64</text>
+            </g>
+          </g>
+
+          <!-- ==================== TANDA SILANG MERAH (RTO / DROP) ==================== -->
+          <g id="dropMarker" visibility="hidden" transform="translate(210, 445)">
+            <circle r="18" fill="#ef4444" fill-opacity="0.2" stroke="#ef4444" stroke-width="2" />
+            <path d="M-7 -7 L7 7 M7 -7 L-7 7" stroke="#f87171" stroke-width="3" stroke-linecap="round" />
+            <rect x="22" y="-12" width="84" height="24" rx="6" fill="#450a0a" stroke="#ef4444" stroke-width="1.2" />
+            <text x="64" y="4" text-anchor="middle" fill="#fecaca" font-size="10" font-weight="700" font-family="JetBrains Mono">RTO / DROP!</text>
+          </g>
+        </svg>
+      </div>
+
+      <!-- Kontrol Kecepatan & Info Paket Aktif -->
+      <div class="bg-slate-900 border-t border-slate-800 px-4 py-2.5 flex flex-wrap items-center justify-between gap-2">
+        <div class="flex items-center gap-2 text-xs">
+          <span class="text-slate-400">Kecepatan Animasi:</span>
+          <div class="inline-flex rounded-lg bg-slate-950 p-0.5 border border-slate-800">
+            <button onclick="setSpeed(1)" id="speed-1" class="px-2 py-0.5 rounded-md text-[11px] font-mono bg-cyan-600 text-white font-semibold cursor-pointer">1x</button>
+            <button onclick="setSpeed(1.5)" id="speed-1.5" class="px-2 py-0.5 rounded-md text-[11px] font-mono text-slate-400 hover:text-white cursor-pointer">1.5x</button>
+            <button onclick="setSpeed(2.5)" id="speed-2.5" class="px-2 py-0.5 rounded-md text-[11px] font-mono text-slate-400 hover:text-white cursor-pointer">2.5x</button>
+          </div>
+        </div>
+        <div id="livePacketInfo" class="text-[11px] font-mono text-slate-400">
+          Menunggu perintah dari CLI...
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== PANEL KANAN: LOG ICMP & STATUS JALUR (4 Kolom) ==================== -->
+    <section class="lg:col-span-4 bg-cyber-panel border border-slate-800 rounded-2xl flex flex-col overflow-hidden shadow-xl min-h-[480px] lg:h-[calc(100vh-105px)]">
+      <!-- Header Panel Kanan -->
+      <div class="bg-slate-900 px-4 py-2.5 border-b border-slate-800 flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+          </svg>
+          <h2 class="text-xs font-semibold uppercase tracking-wider text-slate-200">Status Jalur & Log Respon ICMP</h2>
+        </div>
+        <button onclick="resetLogs()" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-mono transition cursor-pointer">
+          Reset Log
+        </button>
+      </div>
+
+      <!-- Bagian Atas: Visual Status Jalur Per-Hop -->
+      <div class="p-3.5 bg-slate-950/50 border-b border-slate-800 space-y-2.5">
+        <div class="flex items-center justify-between">
+          <span class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Status Jalur Paket Per-Hop</span>
+          <span id="activeTargetLabel" class="text-[11px] font-mono text-cyan-400">Target: -</span>
+        </div>
+
+        <div class="grid grid-cols-1 gap-2">
+          <!-- Kartu Hop 1 -->
+          <div id="hopCard-1" class="bg-slate-900/90 border border-slate-800 rounded-xl px-3 py-2 flex items-center justify-between transition-all">
+            <div class="flex items-center gap-2.5">
+              <span id="hopDot-1" class="w-2.5 h-2.5 rounded-full bg-slate-600"></span>
+              <div>
+                <div class="text-xs font-semibold text-slate-200">Hop 1 — Switch L2/L3 <span class="font-mono text-[11px] text-slate-400">(192.168.1.2)</span></div>
+                <div id="hopDesc-1" class="text-[11px] text-slate-400">Menunggu transmisi paket...</div>
+              </div>
+            </div>
+            <div class="text-right font-mono">
+              <span id="hopBadge-1" class="text-[10px] px-2 py-0.5 rounded-md bg-slate-800 text-slate-400 border border-slate-700">STANDBY</span>
+              <div id="hopRtt-1" class="text-[11px] text-slate-400 mt-0.5">- ms</div>
+            </div>
+          </div>
+
+          <!-- Kartu Hop 2 -->
+          <div id="hopCard-2" class="bg-slate-900/90 border border-slate-800 rounded-xl px-3 py-2 flex items-center justify-between transition-all">
+            <div class="flex items-center gap-2.5">
+              <span id="hopDot-2" class="w-2.5 h-2.5 rounded-full bg-slate-600"></span>
+              <div>
+                <div class="text-xs font-semibold text-slate-200">Hop 2 — Gateway Router <span class="font-mono text-[11px] text-slate-400">(192.168.1.1)</span></div>
+                <div id="hopDesc-2" class="text-[11px] text-slate-400">Menunggu transmisi paket...</div>
+              </div>
+            </div>
+            <div class="text-right font-mono">
+              <span id="hopBadge-2" class="text-[10px] px-2 py-0.5 rounded-md bg-slate-800 text-slate-400 border border-slate-700">STANDBY</span>
+              <div id="hopRtt-2" class="text-[11px] text-slate-400 mt-0.5">- ms</div>
+            </div>
+          </div>
+
+          <!-- Kartu Hop 3 -->
+          <div id="hopCard-3" class="bg-slate-900/90 border border-slate-800 rounded-xl px-3 py-2 flex items-center justify-between transition-all">
+            <div class="flex items-center gap-2.5">
+              <span id="hopDot-3" class="w-2.5 h-2.5 rounded-full bg-slate-600"></span>
+              <div>
+                <div class="text-xs font-semibold text-slate-200">Hop 3 — <span id="hopName-3">Server Tujuan</span> <span id="hopIp-3" class="font-mono text-[11px] text-slate-400">(10.10.10.1)</span></div>
+                <div id="hopDesc-3" class="text-[11px] text-slate-400">Menunggu transmisi paket...</div>
+              </div>
+            </div>
+            <div class="text-right font-mono">
+              <span id="hopBadge-3" class="text-[10px] px-2 py-0.5 rounded-md bg-slate-800 text-slate-400 border border-slate-700">STANDBY</span>
+              <div id="hopRtt-3" class="text-[11px] text-slate-400 mt-0.5">- ms</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Statistik Ringkas Paket ICMP -->
+      <div class="grid grid-cols-4 border-b border-slate-800 bg-slate-900/60 divide-x divide-slate-800 text-center py-2">
+        <div>
+          <div class="text-[10px] uppercase text-slate-400">Terkirim</div>
+          <div id="statSent" class="font-mono text-sm font-bold text-cyan-400">0</div>
+        </div>
+        <div>
+          <div class="text-[10px] uppercase text-slate-400">Diterima</div>
+          <div id="statRecv" class="font-mono text-sm font-bold text-emerald-400">0</div>
+        </div>
+        <div>
+          <div class="text-[10px] uppercase text-slate-400">Packet Loss</div>
+          <div id="statLoss" class="font-mono text-sm font-bold text-rose-400">0%</div>
+        </div>
+        <div>
+          <div class="text-[10px] uppercase text-slate-400">Rata-rata RTT</div>
+          <div id="statAvgRtt" class="font-mono text-sm font-bold text-amber-300">0 ms</div>
+        </div>
+      </div>
+
+      <!-- Bagian Bawah: Tabel Log Respon ICMP Real-Time -->
+      <div class="flex-1 overflow-auto bg-[#070b14]">
+        <table class="w-full text-left border-collapse">
+          <thead class="bg-slate-900/95 sticky top-0 z-10 text-[10px] uppercase tracking-wider text-slate-400 border-b border-slate-800">
+            <tr>
+              <th class="py-2 px-2.5 font-semibold">#</th>
+              <th class="py-2 px-2 font-semibold">Tipe ICMP</th>
+              <th class="py-2 px-2 font-semibold">Sumber / Hop</th>
+              <th class="py-2 px-2 font-semibold">TTL</th>
+              <th class="py-2 px-2 font-semibold">RTT</th>
+              <th class="py-2 px-2.5 font-semibold text-right">Status</th>
+            </tr>
+          </thead>
+          <tbody id="icmpLogBody" class="divide-y divide-slate-800/60 font-mono text-[11px]">
+            <tr id="emptyLogRow">
+              <td colspan="6" class="py-8 text-center text-slate-500 font-sans text-xs">
+                Belum ada log paket ICMP. Jalankan perintah <code class="text-cyan-400 font-mono">ping</code> atau <code class="text-amber-400 font-mono">tracert</code> di terminal kiri.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ==================== MODAL PANDUAN PRAKTIKUM ==================== -->
+  <div id="helpModal" class="fixed inset-0 z-50 hidden bg-black/70 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-2xl w-full p-5 sm:p-6 shadow-2xl space-y-4">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+          <span class="w-2.5 h-2.5 rounded-full bg-cyan-400"></span>
+          Panduan Praktikum Lab Maya TKJ
+        </h3>
+        <button onclick="toggleHelpModal()" class="text-slate-400 hover:text-white p-1 rounded-lg cursor-pointer">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <div class="space-y-3 text-xs sm:text-sm text-slate-300 leading-relaxed max-h-[65vh] overflow-y-auto pr-1">
+        <p>Modul ini mensimulasikan cara kerja protokol <strong>ICMP (Internet Control Message Protocol)</strong> dalam menguji konektivitas jaringan dan melacak rute paket melewati 3 hop perangkat jaringan.</p>
+        
+        <div class="bg-slate-950 border border-slate-800 rounded-xl p-3 space-y-2">
+          <div class="font-semibold text-cyan-400">1. Perintah CLI yang Didukung:</div>
+          <ul class="space-y-1 font-mono text-xs text-slate-300">
+            <li><span class="text-emerald-400">ping [ip_tujuan]</span> — Mengirim 4 paket ICMP Echo Request ke IP tujuan.</li>
+            <li><span class="text-emerald-400">ping [ip_tujuan] -t</span> — Mengirim paket ping terus-menerus hingga dihentikan (<span class="text-rose-400">Ctrl+C</span> atau <span class="text-rose-400">stop</span>).</li>
+            <li><span class="text-amber-400">tracert [ip_tujuan]</span> / <span class="text-amber-400">traceroute [ip_tujuan]</span> — Melacak rute hop demi hop menggunakan kenaikan nilai TTL (Time to Live).</li>
+            <li><span class="text-cyan-300">ipconfig</span> / <span class="text-cyan-300">ifconfig</span> — Menampilkan konfigurasi alamat IP perangkat PC Client.</li>
+            <li><span class="text-slate-400">clear</span> / <span class="text-slate-400">cls</span> — Membersihkan layar terminal.</li>
+          </ul>
+        </div>
+
+        <div class="bg-slate-950 border border-slate-800 rounded-xl p-3 space-y-2">
+          <div class="font-semibold text-amber-400">2. Skenario Target IP untuk Diuji:</div>
+          <ul class="space-y-1 text-xs">
+            <li><code class="text-cyan-300 font-mono">192.168.1.2</code> — <strong>Switch L2/L3 (Hop 1)</strong>: Latensi sangat rendah (~2 ms), TTL=64.</li>
+            <li><code class="text-cyan-300 font-mono">192.168.1.1</code> — <strong>Gateway Router (Hop 2)</strong>: Latensi rendah (~6 ms), TTL=64.</li>
+            <li><code class="text-emerald-300 font-mono">10.10.10.1</code> — <strong>Server Utama (Hop 3)</strong>: Latensi sedang (~18 ms), TTL=62.</li>
+            <li><code class="text-indigo-300 font-mono">8.8.8.8</code> — <strong>DNS Publik / Cloud (Hop 3)</strong>: Latensi internet (~34 ms), TTL=56.</li>
+            <li><code class="text-rose-400 font-mono">192.168.1.99</code> atau IP tak dikenal — <strong>Host Offline / Unreachable</strong>: Menghasilkan <em>Request Timed Out (RTO)</em> dengan 100% Packet Loss.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="flex justify-end pt-2 border-t border-slate-800">
+        <button onclick="toggleHelpModal()" class="px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-semibold transition cursor-pointer">
+          Mulai Praktikum
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== JAVASCRIPT LOGIKA SIMULASI ==================== -->
+  <script>
+    // Konfigurasi Topologi & Database Host Virtual
+    const CLIENT_IP = '192.168.1.10';
+    const HOPS = [
+      { id: 0, name: 'PC Client', ip: '192.168.1.10', y: 75 },
+      { id: 1, name: 'Switch L2/L3', ip: '192.168.1.2', y: 195, baseRtt: 2 },
+      { id: 2, name: 'Gateway Router', ip: '192.168.1.1', y: 320, baseRtt: 6 },
+      { id: 3, name: 'Server Tujuan', ip: '10.10.10.1', y: 445, baseRtt: 18 }
+    ];
+
+    const KNOWN_TARGETS = {
+      '192.168.1.10': { name: 'PC Client (Localhost)', hopReach: 0, online: true, baseRtt: 1, ttl: 128 },
+      '192.168.1.2':  { name: 'Switch L2/L3', hopReach: 1, online: true, baseRtt: 2, ttl: 64 },
+      '192.168.1.1':  { name: 'Gateway Router', hopReach: 2, online: true, baseRtt: 6, ttl: 64 },
+      '10.10.10.1':   { name: 'Server Utama TKJ', hopReach: 3, online: true, baseRtt: 18, ttl: 62 },
+      '8.8.8.8':      { name: 'DNS Publik (Cloud)', hopReach: 3, online: true, baseRtt: 34, ttl: 56 },
+      '192.168.1.99': { name: 'Host Offline / RTO', hopReach: 3, online: false, baseRtt: 0, ttl: 0, failAtHop: 2 }
+    };
+
+    // State Simulasi
+    let isRunning = false;
+    let abortFlag = false;
+    let animationSpeed = 1;
+    let commandHistory = [];
+    let historyIndex = -1;
+
+    // Statistik Log ICMP
+    let logCounter = 0;
+    let stats = {
+      sent: 0,
+      received: 0,
+      rtts: []
+    };
+
+    // Referensi Elemen DOM
+    const terminalOutput = document.getElementById('terminalOutput');
+    const cliInput = document.getElementById('cliInput');
+    const btnStopCli = document.getElementById('btnStopCli');
+    const simStatusDot = document.getElementById('simStatusDot');
+    const simStatusText = document.getElementById('simStatusText');
+    const livePacketInfo = document.getElementById('livePacketInfo');
+    const packetGroup = document.getElementById('packetGroup');
+    const packetHalo = document.getElementById('packetHalo');
+    const packetCore = document.getElementById('packetCore');
+    const packetBadgeBox = document.getElementById('packetBadgeBox');
+    const packetBadgeText = document.getElementById('packetBadgeText');
+    const dropMarker = document.getElementById('dropMarker');
+    const icmpLogBody = document.getElementById('icmpLogBody');
+
+    // Fokus otomatis ke input terminal
+    function focusCliInput() {
+      cliInput.focus();
+    }
+
+    // Toggle Modal Panduan
+    function toggleHelpModal() {
+      const modal = document.getElementById('helpModal');
+      modal.classList.toggle('hidden');
+    }
+
+    // Mengatur kecepatan animasi
+    function setSpeed(speed) {
+      animationSpeed = speed;
+      [1, 1.5, 2.5].forEach(s => {
+        const btn = document.getElementById(`speed-${s}`);
+        if (s === speed) {
+          btn.className = 'px-2 py-0.5 rounded-md text-[11px] font-mono bg-cyan-600 text-white font-semibold cursor-pointer';
+        } else {
+          btn.className = 'px-2 py-0.5 rounded-md text-[11px] font-mono text-slate-400 hover:text-white cursor-pointer';
+        }
+      });
+    }
+
+    // Shortcut keyboard Ctrl+C & Riwayat Panah Atas/Bawah
+    cliInput.addEventListener('keydown', (e) => {
+      if (e.ctrlKey && e.key.toLowerCase() === 'c') {
+        e.preventDefault();
+        if (isRunning) {
+          stopSimulation();
+        } else {
+          printTerminal('C:\\Users\\SiswaTKJ> ^C', 'text-slate-400');
+          cliInput.value = '';
+        }
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (commandHistory.length > 0 && historyIndex > 0) {
+          historyIndex--;
+          cliInput.value = commandHistory[historyIndex];
+        }
+      } else if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        if (historyIndex < commandHistory.length - 1) {
+          historyIndex++;
+          cliInput.value = commandHistory[historyIndex];
+        } else {
+          historyIndex = commandHistory.length;
+          cliInput.value = '';
+        }
+      }
+    });
+
+    // Memasukkan perintah dari tombol preset dan langsung mengeksekusi
+    function insertCommand(cmd) {
+      if (isRunning) {
+        stopSimulation();
+        setTimeout(() => runQuickCommand(cmd), 250);
+      } else {
+        runQuickCommand(cmd);
+      }
+    }
+
+    function runQuickCommand(cmd) {
+      if (isRunning) return;
+      cliInput.value = cmd;
+      processCommand(cmd);
+      cliInput.value = '';
+      focusCliInput();
+    }
+
+    function handleCommandSubmit(e) {
+      e.preventDefault();
+      const rawCmd = cliInput.value.trim();
+      if (!rawCmd) return;
+
+      // Simpan ke riwayat perintah
+      commandHistory.push(rawCmd);
+      historyIndex = commandHistory.length;
+
+      cliInput.value = '';
+      processCommand(rawCmd);
+    }
+
+    // Mencetak baris teks ke terminal
+    function printTerminal(text, colorClass = 'text-slate-200') {
+      const div = document.createElement('div');
+      div.className = `${colorClass} whitespace-pre-wrap break-words`;
+      div.textContent = text;
+      terminalOutput.appendChild(div);
+      terminalOutput.scrollTop = terminalOutput.scrollHeight;
+    }
+
+    function clearTerminal() {
+      terminalOutput.innerHTML = '';
+    }
+
+    // Menghentikan simulasi yang sedang berjalan
+    function stopSimulation() {
+      if (!isRunning) return;
+      abortFlag = true;
+      printTerminal('^C — Proses simulasi dihentikan oleh pengguna.', 'text-amber-400 font-semibold');
+      updateSimStatus('Dihentikan', 'amber');
+    }
+
+    // Validasi format IPv4 sederhana
+    function isValidIPv4(ip) {
+      const regex = /^(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}$/;
+      return regex.test(ip);
+    }
+
+    // Parser Perintah CLI
+    async function processCommand(rawCmd) {
+      printTerminal(`C:\\Users\\SiswaTKJ> ${rawCmd}`, 'text-emerald-400 font-semibold');
+
+      const parts = rawCmd.split(/\s+/);
+      const cmd = parts[0].toLowerCase();
+
+      if (cmd === 'stop') {
+        if (isRunning) stopSimulation();
+        else printTerminal('Tidak ada proses simulasi yang sedang berjalan.', 'text-slate-400');
+        return;
+      }
+
+      if (isRunning) {
+        printTerminal('Simulasi sedang berjalan! Tekan Ctrl+C atau klik tombol Stop terlebih dahulu.', 'text-amber-400');
+        return;
+      }
+
+      switch (cmd) {
+        case 'help':
+        case '?':
+          printHelp();
+          break;
+
+        case 'clear':
+        case 'cls':
+          clearTerminal();
+          break;
+
+        case 'ipconfig':
+        case 'ifconfig':
+          printIpConfig();
+          break;
+
+        case 'ping': {
+          const args = parts.slice(1);
+          const continuous = args.includes('-t');
+          const targetIp = args.find(a => !a.startsWith('-'));
+
+          if (!targetIp) {
+            printTerminal('Penggunaan: ping [-t] <alamat_ip>', 'text-rose-400');
+            printTerminal('Contoh: ping 10.10.10.1', 'text-slate-400');
+            return;
+          }
+          if (!isValidIPv4(targetIp)) {
+            printTerminal(`Ping request could not find host ${targetIp}. Periksa format IPv4 dan coba lagi.`, 'text-rose-400');
+            return;
+          }
+          await executePing(targetIp, continuous);
+          break;
+        }
+
+        case 'tracert':
+        case 'traceroute': {
+          const targetIp = parts[1];
+          if (!targetIp) {
+            printTerminal('Penggunaan: tracert <alamat_ip>', 'text-rose-400');
+            printTerminal('Contoh: tracert 8.8.8.8', 'text-slate-400');
+            return;
+          }
+          if (!isValidIPv4(targetIp)) {
+            printTerminal(`Unable to resolve target system name ${targetIp}.`, 'text-rose-400');
+            return;
+          }
+          await executeTracert(targetIp);
+          break;
+        }
+
+        default:
+          printTerminal(`'${parts[0]}' tidak dikenali sebagai perintah internal maupun eksternal.`, 'text-rose-400');
+          printTerminal(`Ketik 'help' untuk melihat daftar perintah jaringan yang tersedia.`, 'text-slate-400');
+      }
+    }
+
+    function printHelp() {
+      printTerminal('\n=== DAFTAR PERINTAH LAB MAYA TKJ ===', 'text-cyan-400 font-bold');
+      printTerminal('  ping <ip>         : Mengirim 4 paket ICMP Echo Request ke IP tujuan');
+      printTerminal('  ping <ip> -t      : Mengirim paket ping berulang hingga dihentikan (Ctrl+C)');
+      printTerminal('  tracert <ip>      : Melacak jalur hop menuju IP tujuan (increment TTL)');
+      printTerminal('  ipconfig          : Menampilkan konfigurasi IP lokal PC Client');
+      printTerminal('  clear / cls       : Membersihkan tampilan layar terminal');
+      printTerminal('  stop              : Menghentikan simulasi yang sedang berjalan');
+      printTerminal('\n=== TARGET IP PRAKTIKUM ===', 'text-amber-400 font-bold');
+      printTerminal('  192.168.1.2       : Switch L2/L3 (Hop 1)');
+      printTerminal('  192.168.1.1       : Gateway Router (Hop 2)');
+      printTerminal('  10.10.10.1        : Server Utama TKJ (Hop 3 - Online)');
+      printTerminal('  8.8.8.8           : DNS Publik / Cloud Server (Hop 3 - Online)');
+      printTerminal('  192.168.1.99      : Host Offline (Simulasi Request Timed Out)\n');
+    }
+
+    function printIpConfig() {
+      printTerminal('\nKonfigurasi IP Ethernet Adapter PC-Client:', 'text-cyan-400 font-semibold');
+      printTerminal('   Connection-specific DNS Suffix  . : labtkj.local');
+      printTerminal('   Physical Address (MAC)  . . . . . : 00-1B-44-11-3A-B7');
+      printTerminal('   IPv4 Address. . . . . . . . . . . : 192.168.1.10');
+      printTerminal('   Subnet Mask . . . . . . . . . . . : 255.255.255.0');
+      printTerminal('   Default Gateway . . . . . . . . . : 192.168.1.1');
+      printTerminal('   DNS Servers . . . . . . . . . . . : 8.8.8.8\n');
+    }
+
+    // ==================== HELPER VISUAL TOPOLOGI & KARTU HOP ====================
+    function updateSimStatus(text, state) {
+      simStatusText.textContent = text;
+      const colorMap = {
+        idle: 'bg-slate-400',
+        active: 'bg-cyan-400 animate-ping',
+        success: 'bg-emerald-400',
+        amber: 'bg-amber-400',
+        error: 'bg-rose-500'
+      };
+      simStatusDot.className = `w-2 h-2 rounded-full ${colorMap[state] || 'bg-slate-400'}`;
+    }
+
+    function setTargetVisual(targetIp) {
+      const targetInfo = KNOWN_TARGETS[targetIp] || {
+        name: 'Host Tidak Dikenal (RTO)',
+        hopReach: 3,
+        online: false,
+        failAtHop: 2
+      };
+
+      document.getElementById('activeTargetLabel').textContent = `Target: ${targetIp}`;
+
+      // Jika target adalah hop 1 atau hop 2, tetap tampilkan topologi 3 hop dengan highlight pada hop tujuan
+      if (targetInfo.hopReach === 3 || !targetInfo.online) {
+        document.getElementById('targetNodeTitle').textContent = `Hop 3: ${targetInfo.name}`;
+        document.getElementById('targetNodeIp').textContent = targetIp;
+        document.getElementById('targetNodeIp').setAttribute('fill', targetInfo.online ? '#10b981' : '#f43f5e');
+
+        document.getElementById('hopName-3').textContent = targetInfo.name;
+        document.getElementById('hopIp-3').textContent = `(${targetIp})`;
+      } else {
+        document.getElementById('targetNodeTitle').textContent = 'Hop 3: Server Utama';
+        document.getElementById('targetNodeIp').textContent = '10.10.10.1';
+        document.getElementById('targetNodeIp').setAttribute('fill', '#10b981');
+
+        document.getElementById('hopName-3').textContent = 'Server Utama';
+        document.getElementById('hopIp-3').textContent = '(10.10.10.1)';
+      }
+
+      resetVisualStates();
+      return targetInfo;
+    }
+
+    function resetVisualStates() {
+      dropMarker.setAttribute('visibility', 'hidden');
+      packetGroup.setAttribute('visibility', 'hidden');
+
+      // Reset kabel
+      ['link-0-1', 'link-1-2', 'link-2-3'].forEach(id => {
+        const el = document.getElementById(id);
+        el.setAttribute('stroke', '#334155');
+        el.classList.remove('cable-active');
+      });
+
+      // Reset node ring & box
+      [0, 1, 2, 3].forEach(i => {
+        const ring = document.getElementById(`node-${i}-ring`);
+        const box = document.getElementById(`node-${i}-box`);
+        ring.setAttribute('opacity', '0');
+        ring.classList.remove('node-pulse');
+        box.setAttribute('stroke', i === 0 ? '#06b6d4' : '#475569');
+      });
+
+      // Reset Kartu Hop 1..3
+      [1, 2, 3].forEach(h => updateHopCard(h, 'standby', 'Menunggu transmisi paket...', '-'));
+    }
+
+    function highlightNode(hopIdx, colorHex, pulse = true) {
+      const ring = document.getElementById(`node-${hopIdx}-ring`);
+      const box = document.getElementById(`node-${hopIdx}-box`);
+      box.setAttribute('stroke', colorHex);
+      if (pulse) {
+        ring.setAttribute('stroke', colorHex);
+        ring.setAttribute('opacity', '0.9');
+        ring.classList.add('node-pulse');
+      } else {
+        ring.setAttribute('opacity', '0');
+        ring.classList.remove('node-pulse');
+      }
+    }
+
+    function highlightLink(fromHop, toHop, colorHex, active = true) {
+      const minH = Math.min(fromHop, toHop);
+      const maxH = Math.max(fromHop, toHop);
+      const linkEl = document.getElementById(`link-${minH}-${maxH}`);
+      if (!linkEl) return;
+      linkEl.setAttribute('stroke', colorHex);
+      if (active) linkEl.classList.add('cable-active');
+      else linkEl.classList.remove('cable-active');
+    }
+
+    function updateHopCard(hopNum, status, desc, rttText) {
+      const card = document.getElementById(`hopCard-${hopNum}`);
+      const dot = document.getElementById(`hopDot-${hopNum}`);
+      const descEl = document.getElementById(`hopDesc-${hopNum}`);
+      const badge = document.getElementById(`hopBadge-${hopNum}`);
+      const rttEl = document.getElementById(`hopRtt-${hopNum}`);
+
+      descEl.textContent = desc;
+      rttEl.textContent = rttText === '-' ? '- ms' : `${rttText} ms`;
+
+      const styles = {
+        standby: {
+          card: 'bg-slate-900/90 border-slate-800',
+          dot: 'bg-slate-600',
+          badge: 'bg-slate-800 text-slate-400 border-slate-700',
+          label: 'STANDBY'
+        },
+        forwarding: {
+          card: 'bg-cyan-950/30 border-cyan-500/40',
+          dot: 'bg-cyan-400 animate-ping',
+          badge: 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40',
+          label: 'FORWARDING'
+        },
+        replied: {
+          card: 'bg-emerald-950/30 border-emerald-500/40',
+          dot: 'bg-emerald-400',
+          badge: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40',
+          label: 'REPLIED / OK'
+        },
+        exceeded: {
+          card: 'bg-amber-950/30 border-amber-500/40',
+          dot: 'bg-amber-400',
+          badge: 'bg-amber-500/20 text-amber-300 border-amber-500/40',
+          label: 'TTL EXCEEDED'
+        },
+        timeout: {
+          card: 'bg-rose-950/30 border-rose-500/50',
+          dot: 'bg-rose-500',
+          badge: 'bg-rose-500/20 text-rose-300 border-rose-500/40',
+          label: 'TIMEOUT / DROP'
+        }
+      };
+
+      const st = styles[status] || styles.standby;
+      card.className = `${st.card} border rounded-xl px-3 py-2 flex items-center justify-between transition-all`;
+      dot.className = `w-2.5 h-2.5 rounded-full ${st.dot}`;
+      badge.className = `text-[10px] px-2 py-0.5 rounded-md border ${st.badge}`;
+      badge.textContent = st.label;
+    }
+
+    // ==================== ENGINE ANIMASI PAKET SVG ====================
+    function animatePacketSegment(fromHop, toHop, type, labelText) {
+      return new Promise((resolve) => {
+        const startY = HOPS[fromHop].y;
+        const endY = HOPS[toHop].y;
+        const baseDuration = 520 / animationSpeed;
+        const startTime = performance.now();
+
+        // Styling warna paket sesuai jenis ICMP
+        const theme = {
+          request:  { core: '#22d3ee', halo: '#06b6d4', stroke: '#06b6d4', text: '#cffafe' },
+          reply:    { core: '#34d399', halo: '#10b981', stroke: '#10b981', text: '#d1fae5' },
+          exceeded: { core: '#fbbf24', halo: '#f59e0b', stroke: '#f59e0b', text: '#fef3c7' },
+          drop:     { core: '#f87171', halo: '#ef4444', stroke: '#ef4444', text: '#fee2e2' }
+        }[type] || { core: '#22d3ee', halo: '#06b6d4', stroke: '#06b6d4', text: '#cffafe' };
+
+        packetCore.setAttribute('fill', theme.core);
+        packetHalo.setAttribute('fill', theme.halo);
+        packetBadgeBox.setAttribute('stroke', theme.stroke);
+        packetBadgeText.setAttribute('fill', theme.text);
+        packetBadgeText.textContent = labelText;
+        packetGroup.setAttribute('visibility', 'visible');
+
+        highlightLink(fromHop, toHop, theme.stroke, true);
+
+        function step(now) {
+          if (abortFlag) {
+            packetGroup.setAttribute('visibility', 'hidden');
+            highlightLink(fromHop, toHop, '#334155', false);
+            resolve(false);
+            return;
+          }
+
+          const elapsed = now - startTime;
+          const progress = Math.min(elapsed / baseDuration, 1);
+          // Ease in-out cubic
+          const ease = progress < 0.5
+            ? 2 * progress * progress
+            : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+
+          const currentY = startY + (endY - startY) * ease;
+          packetGroup.setAttribute('transform', `translate(210, ${currentY})`);
+
+          if (progress < 1) {
+            requestAnimationFrame(step);
+          } else {
+            highlightLink(fromHop, toHop, theme.stroke, false);
+            resolve(true);
+          }
+        }
+
+        requestAnimationFrame(step);
+      });
+    }
+
+    function sleep(ms) {
+      return new Promise(resolve => setTimeout(resolve, ms / animationSpeed));
+    }
+
+    // ==================== LOGGING KE PANEL KANAN ====================
+    function addIcmpLog({ type, sourceIp, ttl, rtt, status, statusColor }) {
+      const emptyRow = document.getElementById('emptyLogRow');
+      if (emptyRow) emptyRow.remove();
+
+      logCounter++;
+      const tr = document.createElement('tr');
+      tr.className = 'hover:bg-slate-900/80 transition-colors';
+
+      const badgeStyles = {
+        cyan: 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30',
+        green: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
+        amber: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
+        red: 'bg-rose-500/15 text-rose-300 border-rose-500/30'
+      };
+
+      tr.innerHTML = `
+        <td class="py-2 px-2.5 text-slate-500">${logCounter}</td>
+        <td class="py-2 px-2 font-medium text-slate-200">${type}</td>
+        <td class="py-2 px-2 text-slate-300">${sourceIp}</td>
+        <td class="py-2 px-2 text-slate-400">${ttl}</td>
+        <td class="py-2 px-2 text-slate-200">${rtt}</td>
+        <td class="py-2 px-2.5 text-right">
+          <span class="px-1.5 py-0.5 rounded text-[10px] border ${badgeStyles[statusColor] || badgeStyles.cyan}">${status}</span>
+        </td>
+      `;
+
+      icmpLogBody.insertBefore(tr, icmpLogBody.firstChild);
+      updateStatsDisplay();
+    }
+
+    function updateStatsDisplay() {
+      document.getElementById('statSent').textContent = stats.sent;
+      document.getElementById('statRecv').textContent = stats.received;
+
+      const lossPct = stats.sent === 0 ? 0 : Math.round(((stats.sent - stats.received) / stats.sent) * 100);
+      document.getElementById('statLoss').textContent = `${lossPct}%`;
+
+      const avgRtt = stats.rtts.length === 0
+        ? 0
+        : Math.round(stats.rtts.reduce((a, b) => a + b, 0) / stats.rtts.length);
+      document.getElementById('statAvgRtt').textContent = `${avgRtt} ms`;
+    }
+
+    function resetLogs() {
+      logCounter = 0;
+      stats = { sent: 0, received: 0, rtts: [] };
+      updateStatsDisplay();
+      icmpLogBody.innerHTML = `
+        <tr id="emptyLogRow">
+          <td colspan="6" class="py-8 text-center text-slate-500 font-sans text-xs">
+            Log ICMP telah dibersihkan. Siap menerima data simulasi baru.
+          </td>
+        </tr>
+      `;
+      if (!isRunning) {
+        resetVisualStates();
+        document.getElementById('activeTargetLabel').textContent = 'Target: -';
+        livePacketInfo.textContent = 'Menunggu perintah dari CLI...';
+        updateSimStatus('Idle / Siap', 'idle');
+      }
+    }
+
+    // ==================== EKSEKUSI SIMULASI PING ====================
+    async function executePing(targetIp, continuous = false) {
+      isRunning = true;
+      abortFlag = false;
+      btnStopCli.disabled = false;
+
+      const targetInfo = setTargetVisual(targetIp);
+      const maxPackets = continuous ? 999 : 4;
+      let localSent = 0;
+      let localRecv = 0;
+      let localRtts = [];
+
+      printTerminal(`\nPinging ${targetIp} with 32 bytes of data:`, 'text-slate-200');
+      updateSimStatus('Mengirim Ping...', 'active');
+
+      for (let seq = 1; seq <= maxPackets; seq++) {
+        if (abortFlag) break;
+
+        localSent++;
+        stats.sent++;
+        updateStatsDisplay();
+        dropMarker.setAttribute('visibility', 'hidden');
+
+        // Reset kartu hop sebelum tiap paket
+        [1, 2, 3].forEach(h => updateHopCard(h, 'standby', 'Menunggu paket...', '-'));
+        highlightNode(0, '#06b6d4', true);
+
+        livePacketInfo.textContent = `Paket #${seq}: Mengirim Echo Request ke ${targetIp}`;
+        addIcmpLog({
+          type: 'Echo Request',
+          sourceIp: CLIENT_IP,
+          ttl: 64,
+          rtt: '-',
+          status: 'SENT',
+          statusColor: 'cyan'
+        });
+
+        // Kasus Localhost (192.168.1.10)
+        if (targetInfo.hopReach === 0) {
+          await sleep(250);
+          const rtt = 1;
+          localRecv++;
+          stats.received++;
+          stats.rtts.push(rtt);
+          localRtts.push(rtt);
+          printTerminal(`Reply from ${targetIp}: bytes=32 time<1ms TTL=128`, 'text-emerald-400');
+          addIcmpLog({ type: 'Echo Reply', sourceIp: targetIp, ttl: 128, rtt: '<1 ms', status: 'OK', statusColor: 'green' });
+          await sleep(450);
+          continue;
+        }
+
+        // Tentukan hop berhenti maju
+        const finalHop = targetInfo.online ? targetInfo.hopReach : (targetInfo.failAtHop || 2);
+
+        // 1. Fase Forward (Echo Request bergerak dari Hop 0 ke finalHop)
+        let abortedMidway = false;
+        for (let h = 0; h < finalHop; h++) {
+          const nextH = h + 1;
+          const currentTtl = 64 - h;
+          const ok = await animatePacketSegment(h, nextH, 'request', `REQ TTL=${currentTtl}`);
+          if (!ok) { abortedMidway = true; break; }
+
+          highlightNode(nextH, '#06b6d4', true);
+          if (nextH < finalHop) {
+            updateHopCard(nextH, 'forwarding', `Meneruskan paket ke Hop ${nextH + 1}...`, '-');
+          }
+        }
+        if (abortedMidway || abortFlag) break;
+
+        // 2. Evaluasi di Node Tujuan / Titik Drop
+        if (targetInfo.online) {
+          // Sukses mencapai tujuan -> Kirim Echo Reply kembali
+          const jitter = Math.floor(Math.random() * 5) - 2;
+          const rtt = Math.max(1, targetInfo.baseRtt + jitter);
+          localRecv++;
+          stats.received++;
+          stats.rtts.push(rtt);
+          localRtts.push(rtt);
+
+          highlightNode(finalHop, '#10b981', true);
+          updateHopCard(finalHop, 'replied', 'Tujuan tercapai! Mengirim Echo Reply', rtt);
+          livePacketInfo.textContent = `Paket #${seq}: Menerima Echo Reply (${rtt} ms)`;
+
+          // Animasi Reply mundur dari finalHop ke 0
+          for (let h = finalHop; h > 0; h--) {
+            const prevH = h - 1;
+            const ok = await animatePacketSegment(h, prevH, 'reply', `REPLY ${rtt}ms`);
+            if (!ok) { abortedMidway = true; break; }
+            if (prevH > 0) {
+              updateHopCard(prevH, 'replied', 'Meneruskan balasan ke PC Client', Math.max(1, Math.round(rtt * (prevH / finalHop))));
+            }
+          }
+          if (abortedMidway || abortFlag) break;
+
+          packetGroup.setAttribute('visibility', 'hidden');
+          printTerminal(`Reply from ${targetIp}: bytes=32 time=${rtt}ms TTL=${targetInfo.ttl}`, 'text-emerald-400');
+          addIcmpLog({
+            type: 'Echo Reply',
+            sourceIp: targetIp,
+            ttl: targetInfo.ttl,
+            rtt: `${rtt} ms`,
+            status: 'REPLY OK',
+            statusColor: 'green'
+          });
+        } else {
+          // Gagal / Request Timed Out (RTO)
+          highlightNode(finalHop, '#ef4444', true);
+          updateHopCard(finalHop, 'timeout', `Host ${targetIp} tidak merespon (RTO)`, '-');
+          if (finalHop < 3) {
+            updateHopCard(3, 'timeout', 'Tidak terjangkau (Unreachable)', '-');
+          }
+
+          packetGroup.setAttribute('visibility', 'hidden');
+          const dropY = HOPS[finalHop].y;
+          dropMarker.setAttribute('transform', `translate(210, ${dropY})`);
+          dropMarker.setAttribute('visibility', 'visible');
+
+          livePacketInfo.textContent = `Paket #${seq}: Request Timed Out (RTO)`;
+          await sleep(450);
+
+          printTerminal(`Request timed out.`, 'text-rose-400');
+          addIcmpLog({
+            type: 'No Reply (RTO)',
+            sourceIp: targetIp,
+            ttl: '-',
+            rtt: '>2000 ms',
+            status: 'TIMEOUT',
+            statusColor: 'red'
+          });
+        }
+
+        if (seq < maxPackets && !abortFlag) {
+          await sleep(400);
+        }
+      }
+
+      // Ringkasan Statistik Ping di Terminal
+      const lost = localSent - localRecv;
+      const lossPercent = localSent > 0 ? Math.round((lost / localSent) * 100) : 0;
+      printTerminal(`\nPing statistics for ${targetIp}:`, 'text-slate-300');
+      printTerminal(`    Packets: Sent = ${localSent}, Received = ${localRecv}, Lost = ${lost} (${lossPercent}% loss),`, 'text-slate-300');
+      if (localRtts.length > 0) {
+        const minRtt = Math.min(...localRtts);
+        const maxRtt = Math.max(...localRtts);
+        const avgRtt = Math.round(localRtts.reduce((a, b) => a + b, 0) / localRtts.length);
+        printTerminal(`Approximate round trip times in milli-seconds:`, 'text-slate-300');
+        printTerminal(`    Minimum = ${minRtt}ms, Maximum = ${maxRtt}ms, Average = ${avgRtt}ms\n`, 'text-cyan-300');
+      } else {
+        printTerminal('');
+      }
+
+      isRunning = false;
+      btnStopCli.disabled = true;
+      if (!abortFlag) {
+        updateSimStatus('Selesai', targetInfo.online ? 'success' : 'error');
+        livePacketInfo.textContent = `Ping ke ${targetIp} selesai (${lossPercent}% loss)`;
+      }
+    }
+
+    // ==================== EKSEKUSI SIMULASI TRACERT ====================
+    async function executeTracert(targetIp) {
+      isRunning = true;
+      abortFlag = false;
+      btnStopCli.disabled = false;
+
+      const targetInfo = setTargetVisual(targetIp);
+      const maxHops = targetInfo.hopReach === 0 ? 1 : 3;
+
+      printTerminal(`\nTracing route to ${targetIp} over a maximum of 30 hops:\n`, 'text-slate-200');
+      updateSimStatus('Tracing Route...', 'active');
+
+      for (let ttl = 1; ttl <= maxHops; ttl++) {
+        if (abortFlag) break;
+
+        stats.sent++;
+        updateStatsDisplay();
+        dropMarker.setAttribute('visibility', 'hidden');
+
+        livePacketInfo.textContent = `Traceroute Hop ${ttl}: Mengirim probe dengan TTL=${ttl}`;
+        addIcmpLog({
+          type: `Probe (TTL=${ttl})`,
+          sourceIp: CLIENT_IP,
+          ttl: ttl,
+          rtt: '-',
+          status: 'PROBE',
+          statusColor: 'cyan'
+        });
+
+        // Gerakkan paket maju sebanyak `ttl` hop
+        let abortedMidway = false;
+        const stopHop = (!targetInfo.online && ttl > (targetInfo.failAtHop || 2))
+          ? (targetInfo.failAtHop || 2)
+          : ttl;
+
+        for (let h = 0; h < stopHop; h++) {
+          const nextH = h + 1;
+          const remTtl = ttl - h;
+          const ok = await animatePacketSegment(h, nextH, 'request', `PROBE TTL=${remTtl}`);
+          if (!ok) { abortedMidway = true; break; }
+          highlightNode(nextH, '#06b6d4', true);
+        }
+        if (abortedMidway || abortFlag) break;
+
+        // Evaluasi hasil di hop ke-`ttl`
+        const isDestinationReached = targetInfo.online && (ttl === targetInfo.hopReach);
+        const isUnreachableHop = !targetInfo.online && ttl >= 3;
+
+        if (isUnreachableHop) {
+          // Hop 3 tidak terjangkau (RTO)
+          highlightNode(2, '#ef4444', true);
+          updateHopCard(3, 'timeout', `Tidak ada rute / Host ${targetIp} RTO`, '-');
+          packetGroup.setAttribute('visibility', 'hidden');
+          dropMarker.setAttribute('transform', `translate(210, ${HOPS[2].y})`);
+          dropMarker.setAttribute('visibility', 'visible');
+
+          await sleep(450);
+          printTerminal(`  ${ttl}     *        *        *     Request timed out.`, 'text-rose-400');
+          addIcmpLog({
+            type: 'No Reply (RTO)',
+            sourceIp: '*',
+            ttl: ttl,
+            rtt: '*',
+            status: 'TIMEOUT',
+            statusColor: 'red'
+          });
+        } else if (isDestinationReached) {
+          // Tujuan akhir tercapai -> Echo Reply (Hijau)
+          const r1 = Math.max(1, targetInfo.baseRtt + (Math.floor(Math.random() * 3) - 1));
+          const r2 = Math.max(1, targetInfo.baseRtt + (Math.floor(Math.random() * 3) - 1));
+          const r3 = Math.max(1, targetInfo.baseRtt + (Math.floor(Math.random() * 3) - 1));
+          const avg = Math.round((r1 + r2 + r3) / 3);
+
+          stats.received++;
+          stats.rtts.push(avg);
+          updateStatsDisplay();
+
+          highlightNode(ttl, '#10b981', true);
+          updateHopCard(ttl, 'replied', 'Tujuan tercapai! Mengirim Echo Reply', avg);
+
+          for (let h = ttl; h > 0; h--) {
+            const ok = await animatePacketSegment(h, h - 1, 'reply', `ECHO REPLY`);
+            if (!ok) { abortedMidway = true; break; }
+          }
+          if (abortedMidway || abortFlag) break;
+
+          packetGroup.setAttribute('visibility', 'hidden');
+          printTerminal(`  ${ttl}    ${r1} ms    ${r2} ms    ${r3} ms  ${targetIp} [${targetInfo.name}]`, 'text-emerald-400');
+          addIcmpLog({
+            type: 'Echo Reply',
+            sourceIp: targetIp,
+            ttl: targetInfo.ttl,
+            rtt: `${avg} ms`,
+            status: 'REACHED',
+            statusColor: 'green'
+          });
+          break; // Selesai karena tujuan sudah tercapai
+        } else {
+          // Hop perantara -> TTL habis (0) -> Pantulkan ICMP Time Exceeded (Amber)
+          const hopObj = HOPS[ttl];
+          const r1 = Math.max(1, hopObj.baseRtt + (Math.floor(Math.random() * 3) - 1));
+          const r2 = Math.max(1, hopObj.baseRtt + (Math.floor(Math.random() * 3) - 1));
+          const r3 = Math.max(1, hopObj.baseRtt + (Math.floor(Math.random() * 3) - 1));
+          const avg = Math.round((r1 + r2 + r3) / 3);
+
+          stats.received++;
+          stats.rtts.push(avg);
+          updateStatsDisplay();
+
+          highlightNode(ttl, '#f59e0b', true);
+          updateHopCard(ttl, 'exceeded', 'TTL=0! Memantulkan Time Exceeded', avg);
+
+          for (let h = ttl; h > 0; h--) {
+            const ok = await animatePacketSegment(h, h - 1, 'exceeded', `TIME EXCEEDED`);
+            if (!ok) { abortedMidway = true; break; }
+          }
+          if (abortedMidway || abortFlag) break;
+
+          packetGroup.setAttribute('visibility', 'hidden');
+          printTerminal(`  ${ttl}    ${r1} ms    ${r2} ms    ${r3} ms  ${hopObj.ip} [${hopObj.name}]`, 'text-amber-300');
+          addIcmpLog({
+            type: 'Time Exceeded',
+            sourceIp: hopObj.ip,
+            ttl: 64,
+            rtt: `${avg} ms`,
+            status: `HOP ${ttl} OK`,
+            statusColor: 'amber'
+          });
+        }
+
+        await sleep(350);
+      }
+
+      if (!abortFlag) {
+        printTerminal('\nTrace complete.\n', 'text-cyan-400 font-semibold');
+        updateSimStatus('Trace Selesai', targetInfo.online ? 'success' : 'error');
+        livePacketInfo.textContent = `Traceroute ke ${targetIp} selesai`;
+      }
+
+      isRunning = false;
+      btnStopCli.disabled = true;
+    }
+
+    // Inisialisasi fokus awal saat halaman dimuat
+    window.addEventListener('DOMContentLoaded', () => {
+      focusCliInput();
+    });
+  </script>
+</body>
+</html>
